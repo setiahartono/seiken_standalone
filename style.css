@@ -1,0 +1,69 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f10; color: #fff; margin: 0; }
+
+/* ---------- Two-section layout: main stage (~80%) + sidebar ---------- */
+#app { display: flex; gap: 16px; padding: 16px; height: 100vh; height: 100dvh; }
+#main { flex: 1 1 80%; min-width: 0; display: flex; align-items: center; justify-content: center; }
+#container { position: relative; width: 100%; height: 100%; max-width: 100%; max-height: 100%; background: #000; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+video { background: #000; object-fit: contain; }
+
+#instruct { position: absolute; top: 10px; left: 10px; right: 96px; z-index: 2; background: rgba(0, 0, 0, 0.66); padding: 10px 12px; border-radius: 10px; font-size: 15px; line-height: 1.3; text-align: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+#ring { position: absolute; top: 10px; right: 10px; z-index: 2; width: 72px; height: 72px; border-radius: 50%; background: #2a2a2a; display: flex; align-items: center; justify-content: center; }
+#ring::before { content: ""; position: absolute; top: 50%; left: 50%; width: 52px; height: 52px; border-radius: 50%; background: #0b0b0b; transform: translate(-50%, -50%); }
+#ringLabel { position: relative; font-size: 14px; font-weight: 700; color: #fff; }
+
+/* ---------- Start overlay: the camera stays off until the user starts it ---------- */
+#startOverlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; background: radial-gradient(120% 120% at 50% 0%, #1b2430 0%, #0a0a0b 70%); transition: opacity 0.25s ease; }
+#startOverlay.hidden { opacity: 0; pointer-events: none; }
+.startCard { max-width: 420px; }
+.startKicker { display: inline-block; margin-bottom: 14px; padding: 4px 10px; border: 1px solid rgba(255, 193, 7, 0.35); border-radius: 999px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #FFC107; }
+.startCard h3 { margin: 0 0 8px; font-size: 22px; }
+#startMsg { margin: 0 0 18px; font-size: 14px; line-height: 1.45; color: #b9c0c8; }
+#startBtn { appearance: none; border: 0; cursor: pointer; font: inherit; font-size: 16px; font-weight: 700; padding: 13px 22px; border-radius: 12px; background: #FFC107; color: #141414; box-shadow: 0 6px 18px rgba(255, 193, 7, 0.28); transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease; }
+#startBtn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(255, 193, 7, 0.38); }
+#startBtn:disabled { opacity: 0.55; cursor: progress; }
+
+/* ---------- Sidebar ---------- */
+#sidebar { flex: 0 0 clamp(250px, 21%, 340px); min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 2px; }
+.side-head .logo { font-size: 20px; font-weight: 800; letter-spacing: 0.18em; }
+.side-head .tag { margin-top: 2px; font-size: 12px; color: #8b939c; }
+.panel { background: #17181b; border: 1px solid #23252a; border-radius: 12px; padding: 12px; }
+.panel-title { margin-bottom: 10px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #8b939c; }
+.cam-row { display: flex; align-items: center; gap: 8px; }
+.pill { padding: 4px 9px; border-radius: 999px; background: #2a2d33; color: #c3c9d1; font-size: 11px; font-weight: 700; }
+.pill.on { background: rgba(76, 175, 80, 0.18); color: #7ee287; box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.35); }
+.btn.small { appearance: none; cursor: pointer; font: inherit; font-size: 12px; padding: 6px 10px; border: 1px solid #33373e; border-radius: 8px; background: #2a2d33; color: #e7ebf0; }
+.btn.small:hover { background: #33373e; }
+.help { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #9aa3ad; }
+
+/* Step preview picture (placeholder art, swapped for each of the 3 steps) */
+.step-figure { margin: 0; }
+.step-figure img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; background: #20232a; border: 1px solid #2a2e36; border-radius: 10px; }
+#stepCaption { margin-top: 8px; font-size: 12px; font-weight: 600; color: #c3c9d1; text-align: center; }
+.steps { display: flex; flex-direction: column; gap: 6px; }
+.step { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; background: #20232a; color: #98a0a9; font-size: 13px; transition: background 0.15s ease, color 0.15s ease; }
+.step .n { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; background: #2c3037; color: #aab2bb; font-size: 11px; font-weight: 700; }
+.step.active { background: rgba(255, 193, 7, 0.16); color: #FFD54F; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(255, 193, 7, 0.4); }
+.step.active .n { background: #FFC107; color: #141414; }
+.step.done { background: rgba(76, 175, 80, 0.16); color: #8ce68f; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.35); }
+.step.done .n { background: #4CAF50; color: #0e1510; }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: #a8b0ba; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.sw { flex: none; width: 12px; height: 12px; border-radius: 3px; }
+.sw.ghost { border: 1px dashed rgba(255, 255, 255, 0.55); }
+.sw.arrow { background: #4FC3F7; }
+.sw.crease { border: 2px solid #29B6F6; border-radius: 50%; }
+.sw.good { border: 2px solid #4CAF50; border-radius: 50%; }
+#debug { min-height: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.55; color: #90CAF9; word-break: break-word; }
+
+/* ---------- Responsive: stack stage above sidebar ---------- */
+@media (max-width: 900px) {
+  #app { flex-direction: column; height: auto; min-height: 100vh; min-height: 100dvh; padding: 12px; }
+  #main { flex: 0 0 auto; height: 52vh; height: 52dvh; min-height: 260px; }
+  #sidebar { flex: 0 0 auto; width: 100%; overflow: visible; }
+  #instruct { right: 84px; font-size: 13px; }
+  #ring { width: 62px; height: 62px; }
+  #ring::before { width: 44px; height: 44px; }
+}
