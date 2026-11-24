@@ -430,9 +430,9 @@ function advanceHold(conditionMet, now) {
 
 // Sidebar step picture: one placeholder illustration per step (1..3).
 const STEP_PREVIEWS = {
-  1: { src: "assets/step-1.svg", alt: "Step 1 of 3: extend all four fingers straight", caption: "Step 1 of 3 — Extend" },
-  2: { src: "assets/step-2.svg", alt: "Step 2 of 3: curl the four fingers into a fist", caption: "Step 2 of 3 — Curl" },
-  3: { src: "assets/step-3.svg", alt: "Step 3 of 3: thumb tip on the middle-ring crease", caption: "Step 3 of 3 — Seiken" }
+  1: { src: "assets/step-1.jpeg", alt: "Step 1 of 3: extend all four fingers straight", caption: "Step 1 of 3 — Extend" },
+  2: { src: "assets/step-2.jpeg", alt: "Step 2 of 3: curl the four fingers into a fist", caption: "Step 2 of 3 — Curl" },
+  3: { src: "assets/step-3.jpeg", alt: "Step 3 of 3: thumb tip on the middle-ring crease", caption: "Step 3 of 3 — Seiken" }
 };
 let previewStep = 0; // step whose picture is currently shown
 

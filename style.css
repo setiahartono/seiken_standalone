@@ -40,7 +40,7 @@ video { background: #000; object-fit: contain; }
 
 /* Step preview picture (placeholder art, swapped for each of the 3 steps) */
 .step-figure { margin: 0; }
-.step-figure img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; background: #20232a; border: 1px solid #2a2e36; border-radius: 10px; }
+.step-figure img { display: block; width: 100%; height: auto; object-fit: cover; background: #20232a; border: 1px solid #2a2e36; border-radius: 10px; }
 #stepCaption { margin-top: 8px; font-size: 12px; font-weight: 600; color: #c3c9d1; text-align: center; }
 .steps { display: flex; flex-direction: column; gap: 6px; }
 .step { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; background: #20232a; color: #98a0a9; font-size: 13px; transition: background 0.15s ease, color 0.15s ease; }
