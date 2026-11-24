@@ -4,30 +4,94 @@
   <meta charset="UTF-8">
   <title>Seiken Karate Trainer</title>
   <style>
-    body { font-family: sans-serif; background: #121212; color: #fff; margin: 0; display: flex; flex-direction: column; align-items: center; }
-    #container { position: relative; margin-top: 20px; width: 640px; height: 480px; }
-    video, canvas { position: absolute; top: 0; left: 0; width: 640px; height: 480px; transform: scaleX(-1); }
-    #instruct { position: absolute; top: 8px; left: 10px; right: 88px; background: rgba(0,0,0,0.65); padding: 10px 12px; border-radius: 8px; font-size: 17px; text-align: center; }
-    #debug { position: absolute; bottom: 74px; left: 10px; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: monospace; color: #90CAF9; pointer-events: none; }
-    #feedback { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; text-align: center; }
-    #ring { position: absolute; top: 8px; right: 10px; width: 68px; height: 68px; border-radius: 50%; background: #2a2a2a; display: flex; align-items: center; justify-content: center; }
-    #ring::before { content: ""; position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; border-radius: 50%; background: #121212; transform: translate(-50%, -50%); }
-    #ringLabel { position: relative; font-size: 14px; font-weight: bold; color: #fff; }
-    .steps { display: flex; gap: 8px; justify-content: center; }
-    .step { padding: 5px 14px; border-radius: 14px; background: #2a2a2a; color: #9e9e9e; font-size: 14px; transition: background 0.15s; }
-    .step.active { background: #FFC107; color: #121212; font-weight: bold; }
-    .step.done { background: #4CAF50; color: #121212; font-weight: bold; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f10; color: #fff; margin: 0; }
+
+    /* ---------- Two-section layout: main stage (~80%) + sidebar ---------- */
+    #app { display: flex; gap: 16px; padding: 16px; height: 100vh; height: 100dvh; }
+    #main { flex: 1 1 80%; min-width: 0; display: flex; align-items: center; justify-content: center; }
+    #container { position: relative; width: 100%; height: 100%; max-width: 100%; max-height: 100%; background: #000; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+    video { background: #000; object-fit: contain; }
+
+    #instruct { position: absolute; top: 10px; left: 10px; right: 96px; z-index: 2; background: rgba(0, 0, 0, 0.66); padding: 10px 12px; border-radius: 10px; font-size: 15px; line-height: 1.3; text-align: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+    #ring { position: absolute; top: 10px; right: 10px; z-index: 2; width: 72px; height: 72px; border-radius: 50%; background: #2a2a2a; display: flex; align-items: center; justify-content: center; }
+    #ring::before { content: ""; position: absolute; top: 50%; left: 50%; width: 52px; height: 52px; border-radius: 50%; background: #0b0b0b; transform: translate(-50%, -50%); }
+    #ringLabel { position: relative; font-size: 14px; font-weight: 700; color: #fff; }
+
+    /* ---------- Start overlay: the camera stays off until the user starts it ---------- */
+    #startOverlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; background: radial-gradient(120% 120% at 50% 0%, #1b2430 0%, #0a0a0b 70%); transition: opacity 0.25s ease; }
+    #startOverlay.hidden { opacity: 0; pointer-events: none; }
+    .startCard { max-width: 420px; }
+    .startKicker { display: inline-block; margin-bottom: 14px; padding: 4px 10px; border: 1px solid rgba(255, 193, 7, 0.35); border-radius: 999px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #FFC107; }
+    .startCard h3 { margin: 0 0 8px; font-size: 22px; }
+    #startMsg { margin: 0 0 18px; font-size: 14px; line-height: 1.45; color: #b9c0c8; }
+    #startBtn { appearance: none; border: 0; cursor: pointer; font: inherit; font-size: 16px; font-weight: 700; padding: 13px 22px; border-radius: 12px; background: #FFC107; color: #141414; box-shadow: 0 6px 18px rgba(255, 193, 7, 0.28); transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease; }
+    #startBtn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(255, 193, 7, 0.38); }
+    #startBtn:disabled { opacity: 0.55; cursor: progress; }
+
+    /* ---------- Sidebar ---------- */
+    #sidebar { flex: 0 0 clamp(250px, 21%, 340px); min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 2px; }
+    .side-head .logo { font-size: 20px; font-weight: 800; letter-spacing: 0.18em; }
+    .side-head .tag { margin-top: 2px; font-size: 12px; color: #8b939c; }
+    .panel { background: #17181b; border: 1px solid #23252a; border-radius: 12px; padding: 12px; }
+    .panel-title { margin-bottom: 10px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #8b939c; }
+    .cam-row { display: flex; align-items: center; gap: 8px; }
+    .pill { padding: 4px 9px; border-radius: 999px; background: #2a2d33; color: #c3c9d1; font-size: 11px; font-weight: 700; }
+    .pill.on { background: rgba(76, 175, 80, 0.18); color: #7ee287; box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.35); }
+    .btn.small { appearance: none; cursor: pointer; font: inherit; font-size: 12px; padding: 6px 10px; border: 1px solid #33373e; border-radius: 8px; background: #2a2d33; color: #e7ebf0; }
+    .btn.small:hover { background: #33373e; }
+    .help { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #9aa3ad; }
+    .steps { display: flex; flex-direction: column; gap: 6px; }
+    .step { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; background: #20232a; color: #98a0a9; font-size: 13px; transition: background 0.15s ease, color 0.15s ease; }
+    .step .n { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; background: #2c3037; color: #aab2bb; font-size: 11px; font-weight: 700; }
+    .step.active { background: rgba(255, 193, 7, 0.16); color: #FFD54F; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(255, 193, 7, 0.4); }
+    .step.active .n { background: #FFC107; color: #141414; }
+    .step.done { background: rgba(76, 175, 80, 0.16); color: #8ce68f; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.35); }
+    .step.done .n { background: #4CAF50; color: #0e1510; }
+    .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: #a8b0ba; }
+    .legend li { display: flex; align-items: center; gap: 8px; }
+    .sw { flex: none; width: 12px; height: 12px; border-radius: 3px; }
+    .sw.ghost { border: 1px dashed rgba(255, 255, 255, 0.55); }
+    .sw.arrow { background: #4FC3F7; }
+    .sw.crease { border: 2px solid #29B6F6; border-radius: 50%; }
+    .sw.good { border: 2px solid #4CAF50; border-radius: 50%; }
+    #debug { min-height: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.55; color: #90CAF9; word-break: break-word; }
+
+    /* ---------- Responsive: stack stage above sidebar ---------- */
+    @media (max-width: 900px) {
+      #app { flex-direction: column; height: auto; min-height: 100vh; min-height: 100dvh; padding: 12px; }
+      #main { flex: 0 0 auto; height: 52vh; height: 52dvh; min-height: 260px; }
+      #sidebar { flex: 0 0 auto; width: 100%; overflow: visible; }
+      #instruct { right: 84px; font-size: 13px; }
+      #ring { width: 62px; height: 62px; }
+      #ring::before { width: 44px; height: 44px; }
+    }
   </style>
   <!-- Load MediaPipe Tasks Vision -->
   <script type="module">
     import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
-    let handLandmarker;
-    let aspect = 0.75; // videoHeight / videoWidth, refreshed every frame
-    let lastSeen = 0;  // timestamp of the last frame with a detected hand
+    let handLandmarker = null;
+    let aspect = 0.75;   // videoHeight / videoWidth, refreshed every frame
+    let lastSeen = 0;    // timestamp of the last frame with a detected hand
+    let stageAR = 4 / 3; // stage aspect ratio (video width / height)
+    let running = false; // camera + detection loop active
+    let mediaStream = null;
+    let rafId = 0;
+
     const video = document.getElementById("webcam");
     const canvas = document.getElementById("output");
     const ctx = canvas.getContext("2d");
+    const mainEl = document.getElementById("main");
+    const stageEl = document.getElementById("container");
+    const startOverlay = document.getElementById("startOverlay");
+    const startBtn = document.getElementById("startBtn");
+    const startMsg = document.getElementById("startMsg");
+    const stopBtn = document.getElementById("stopBtn");
+    const camStateEl = document.getElementById("camState");
+    const statusEl = document.getElementById("status");
     const debugEl = document.getElementById("debug");
     const instructEl = document.getElementById("instruct");
     const ringEl = document.getElementById("ring");
@@ -36,28 +100,174 @@
     let flashUntil = 0; // success-flash end timestamp
     let lastHint = "";
 
+    const IDLE_HINT = "Camera is off — press Start camera to train.";
+
+    // The MediaPipe model is loaded lazily and cached. Opening the camera is a
+    // separate, explicit user action (see startCamera below).
+    let modelPromise = null;
+    function ensureModel() {
+      if (handLandmarker) return Promise.resolve(handLandmarker);
+      if (!modelPromise) {
+        modelPromise = (async () => {
+          const vision = await FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+          );
+          handLandmarker = await HandLandmarker.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+              delegate: "GPU"
+            },
+            runningMode: "VIDEO",
+            numHands: 1
+          });
+          return handLandmarker;
+        })();
+        // Allow a retry after a failed download instead of caching the rejection.
+        modelPromise.catch(() => { modelPromise = null; handLandmarker = null; });
+      }
+      return modelPromise;
+    }
+
+    function setCamState(text, on) {
+      if (!camStateEl) return;
+      camStateEl.textContent = text;
+      camStateEl.className = on ? "pill on" : "pill";
+    }
+
+    function setStatus(text) {
+      if (statusEl) statusEl.textContent = text;
+    }
+
+    // Fit the stage into the main section while keeping the video aspect ratio,
+    // so the 80/20 split stays responsive without stretching the picture.
+    function fitStage() {
+      if (!mainEl || !stageEl) return;
+      const box = mainEl.getBoundingClientRect();
+      const ar = stageAR > 0 ? stageAR : 4 / 3;
+      let w = box.width, h = w / ar;
+      if (h > box.height) { h = box.height; w = h * ar; }
+      stageEl.style.width = Math.max(0, Math.floor(w)) + "px";
+      stageEl.style.height = Math.max(0, Math.floor(h)) + "px";
+    }
+
     async function init() {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-      );
-      handLandmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-          delegate: "GPU"
-        },
-        runningMode: "VIDEO",
-        numHands: 1
-      });
-
-      startCamera();
+      // No camera here: the model is prepared, the camera waits for the button.
+      updateHud(0, IDLE_HINT, training.step);
+      setCamState("Off", false);
+      fitStage();
+      setStatus("Loading hand model…");
+      try {
+        await ensureModel();
+        setStatus("Model ready. Press Start camera to train.");
+        startBtn.disabled = false;
+        startBtn.textContent = "Start camera to train";
+      } catch (err) {
+        console.error(err);
+        setStatus("Hand model failed to load.");
+        startMsg.textContent = "The hand-tracking model could not be downloaded. Check your connection, then retry.";
+        startBtn.disabled = false;
+        startBtn.textContent = "Retry";
+      }
     }
 
-    function startCamera() {
-      navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }).then((stream) => {
-        video.srcObject = stream;
-        video.addEventListener("loadeddata", predictWebcam);
-      });
+    // Explicit camera start (button). Nothing is captured before this runs.
+    async function startCamera() {
+      if (running) return;
+      startBtn.disabled = true;
+      startBtn.textContent = "Starting camera…";
+      startMsg.textContent = "Allow camera access in the browser prompt.";
+      setStatus("Starting camera…");
+
+      try {
+        await ensureModel();
+      } catch (err) {
+        console.error(err);
+        startBtn.disabled = false;
+        startBtn.textContent = "Retry";
+        startMsg.textContent = "The hand-tracking model could not be downloaded. Check your connection, then retry.";
+        setStatus("Hand model failed to load.");
+        return;
+      }
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+          audio: false
+        });
+        video.srcObject = mediaStream;
+        await video.play();
+        if (video.videoWidth && video.videoHeight) {
+          stageAR = video.videoWidth / video.videoHeight;
+          aspect = video.videoHeight / video.videoWidth;
+        }
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        fitStage();
+
+        running = true;
+        lastSeen = performance.now();
+        resetTraining();
+        for (const k in smoothState) delete smoothState[k];
+        flashUntil = 0;
+        if (debugEl) debugEl.innerText = "";
+
+        startBtn.disabled = false;
+        startBtn.textContent = "Start camera to train";
+        startOverlay.classList.add("hidden");
+        stopBtn.hidden = false;
+        setCamState("On", true);
+        setStatus("Camera running. Show your hand to the stage.");
+        lastHint = "";
+        updateHud(0, "Show your hand to start!", training.step);
+
+        predictWebcam();
+      } catch (err) {
+        console.error(err);
+        if (mediaStream) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          mediaStream = null;
+        }
+        video.srcObject = null;
+        running = false;
+        startBtn.disabled = false;
+        startBtn.textContent = "Start camera to train";
+        startMsg.textContent = err && err.name === "NotAllowedError"
+          ? "Camera permission was blocked. Allow camera access in the address bar, then try again."
+          : "Could not open the camera. Close other apps that use it, then try again.";
+        setCamState("Off", false);
+        setStatus("Camera unavailable.");
+      }
     }
+
+    function stopCamera() {
+      running = false;
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((t) => t.stop());
+        mediaStream = null;
+      }
+      video.srcObject = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      resetTraining();
+      for (const k in smoothState) delete smoothState[k];
+      flashUntil = 0;
+      if (debugEl) debugEl.innerText = "";
+      startOverlay.classList.remove("hidden");
+      stopBtn.hidden = true;
+      startBtn.disabled = false;
+      startBtn.textContent = "Start camera to train";
+      startMsg.textContent = "Camera off. Press start when you are ready.";
+      setCamState("Off", false);
+      setStatus("Camera off.");
+      lastHint = "";
+      updateHud(0, IDLE_HINT, training.step);
+    }
+
+    startBtn.addEventListener("click", startCamera);
+    stopBtn.addEventListener("click", stopCamera);
+    window.addEventListener("resize", fitStage);
+    window.addEventListener("orientationchange", fitStage);
+    if (window.ResizeObserver && mainEl) new ResizeObserver(fitStage).observe(mainEl);
 
     // Mathematical utility: Distance between 3D points
     function dist(p1, p2) {
@@ -65,15 +275,25 @@
     }
 
     async function predictWebcam() {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      if (!running || !handLandmarker) return;
+      // Intrinsic video size drives the drawing resolution (set once, not per frame).
+      if (video.videoWidth && canvas.width !== video.videoWidth) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
       const now = performance.now();
 
-      const results = await handLandmarker.detectForVideo(video, now);
+      let results = null;
+      try {
+        results = await handLandmarker.detectForVideo(video, now);
+      } catch (err) {
+        console.error(err);
+      }
+      if (!running) return; // camera stopped while detecting
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (results.landmarks && results.landmarks.length > 0) {
+      if (results && results.landmarks && results.landmarks.length > 0) {
         lastSeen = now;
         const lm = results.landmarks[0];
         aspect = video.videoWidth ? video.videoHeight / video.videoWidth : 0.75;
@@ -92,7 +312,7 @@
         updateHud(0, lastHint, training.step);
       }
 
-      requestAnimationFrame(predictWebcam);
+      rafId = requestAnimationFrame(predictWebcam);
     }
 
     // ---------- Hand topology (MediaPipe landmarks) ----------
@@ -643,20 +863,66 @@
   </script>
 </head>
 <body>
-  <h2>Seiken (Karate Fist) Trainer</h2>
-  <div id="container">
-    <video id="webcam" autoplay playsinline></video>
-    <canvas id="output"></canvas>
-    <div id="instruct">Loading MediaPipe model...</div>
-    <div id="ring"><span id="ringLabel">2.0s</span></div>
-    <div id="debug"></div>
-    <div id="feedback">
-      <div class="steps">
-        <span class="step active" id="hud1">1 Extend</span>
-        <span class="step" id="hud2">2 Curl</span>
-        <span class="step" id="hud3">3 Seiken</span>
+  <div id="app">
+    <section id="main">
+      <div id="container">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="output"></canvas>
+
+        <div id="instruct">Camera is off — press Start camera to train.</div>
+        <div id="ring"><span id="ringLabel">2.0s</span></div>
+
+        <div id="startOverlay">
+          <div class="startCard">
+            <div class="startKicker">Camera off</div>
+            <h3>Seiken (Karate Fist) Trainer</h3>
+            <p id="startMsg">Your camera stays off until you press start. Nothing is recorded or uploaded.</p>
+            <button id="startBtn" type="button" disabled>Loading hand model…</button>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <aside id="sidebar">
+      <header class="side-head">
+        <div class="logo">SEIKEN</div>
+        <div class="tag">Karate fist trainer · 3 steps</div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-title">Camera</div>
+        <div class="cam-row">
+          <span id="camState" class="pill">Off</span>
+          <button id="stopBtn" class="btn small" type="button" hidden>Stop camera</button>
+        </div>
+        <p class="help" id="status">Loading hand model…</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Drill · hold each step 2 s</div>
+        <div class="steps">
+          <div class="step active" id="hud1"><span class="n">1</span><span>Extend</span></div>
+          <div class="step" id="hud2"><span class="n">2</span><span>Curl</span></div>
+          <div class="step" id="hud3"><span class="n">3</span><span>Seiken</span></div>
+        </div>
+        <p class="help">Fill the ring at the top of the stage to advance.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Guide</div>
+        <ul class="legend">
+          <li><span class="sw ghost"></span>Dashed ghost = target shape</li>
+          <li><span class="sw arrow"></span>Arrow = move this way</li>
+          <li><span class="sw crease"></span>Ring = thumb target spot</li>
+          <li><span class="sw good"></span>Green = locked / correct</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Diagnostics</div>
+        <div id="debug"></div>
+      </section>
+    </aside>
   </div>
 </body>
 </html>
