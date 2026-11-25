@@ -653,7 +653,22 @@ const THUMB_BONES = [[0, 1], [1, 2], [2, 3], [3, 4]];
 const FINGER_TIPS = { index: 8, middle: 12, ring: 16, pinky: 20 };
 const FINGER_PIPS = { index: 6, middle: 10, ring: 14, pinky: 18 };
 
+const LOCK_R = 9; // radius (px) of the target ring on the middle -> ring crease
+
 function toPx(p, W, H) { return { x: p.x * W, y: p.y * H }; }
+
+// Canvas-space meeting point of the thumb guides: the BOTTOM edge of the lock
+// ring, i.e. the ideal crease spot pushed down by the ring radius, so the
+// guide arrow and the ideal (ghost) thumb tip converge just under the circle
+// instead of on its centre. A/B carry aspect-corrected y, hence the /aspect.
+function lockAim(result, W, H) {
+  const A = result.points.A, B = result.points.B;
+  const ti = result.tIdeal != null ? result.tIdeal : THRESH.thumbGapIdeal;
+  return {
+    x: (A.x + ti * (B.x - A.x)) * W,
+    y: ((A.y + ti * (B.y - A.y)) / aspect) * H + LOCK_R
+  };
+}
 
 function drawArrow(from, to, color, width) {
   const ang = Math.atan2(to.y - from.y, to.x - from.x);
@@ -674,10 +689,13 @@ function drawArrow(from, to, color, width) {
   ctx.fill();
 }
 
-function drawGhost(landmarks, step, satisfied, W, H) {
+function drawGhost(landmarks, step, satisfied, W, H, tipAt) {
   const local = POSES[step];
   if (!local) return;
   const pts = fromLocal(local, landmarks);
+  // Step 3: the ideal thumb ENDS at the lock ring's bottom edge (lockAim), so the
+  // ghost thumb and the guide arrow meet at the same point under the circle.
+  if (tipAt) pts[4] = { x: tipAt.x / W, y: tipAt.y / H };
   const alpha = satisfied ? 0.10 : 0.34;
   ctx.strokeStyle = "rgba(255,255,255," + alpha + ")";
   ctx.lineWidth = 2;
@@ -729,14 +747,11 @@ function drawStepAids(landmarks, result, W, H) {
     }
   } else if (result.step === 3) {
     const thumb = toPx(landmarks[4], W, H);
-    const A = result.points.A, B = result.points.B;
-    const target = {
-      x: (A.x + result.tIdeal * (B.x - A.x)) * W,
-      y: ((A.y + result.tIdeal * (B.y - A.y)) / aspect) * H
-    };
+    // Aim at the ring's bottom edge, not its centre (see lockAim).
+    const aim = lockAim(result, W, H);
     if (!result.thumbEdge || !result.contact) {
       const between = result.t >= THRESH.thumbGapMin && result.t <= THRESH.thumbGapMax;
-      drawArrow(thumb, target, between ? COLORS.warn : COLORS.bad, 3);
+      drawArrow(thumb, aim, between ? COLORS.warn : COLORS.bad, 3);
     }
     drawStatusRing(thumb, result.thumbOk, 10);
   }
@@ -802,7 +817,8 @@ function drawLandmarks(landmarks, result, now) {
   // Ghost target shape, fading once the step's shape matches.
   if (!finished) {
     const satisfied = step === 1 ? result.allExtended : step === 2 ? result.allCurled : result.thumbOk;
-    drawGhost(landmarks, step, satisfied, W, H);
+    const tipAt = step === 3 ? lockAim(result, W, H) : null;
+    drawGhost(landmarks, step, satisfied, W, H, tipAt);
   }
 
   // Middle -> ring crease + target spot (only relevant for step 3).
@@ -822,7 +838,7 @@ function drawLandmarks(landmarks, result, now) {
     ctx.strokeStyle = result.thumbEdge ? COLORS.good : COLORS.warn;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(ax + (bx - ax) * ti, ay + (by - ay) * ti, 9, 0, 2 * Math.PI);
+    ctx.arc(ax + (bx - ax) * ti, ay + (by - ay) * ti, LOCK_R, 0, 2 * Math.PI);
     ctx.stroke();
   }
 
