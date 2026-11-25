@@ -14,16 +14,16 @@
         <video id="webcam" autoplay playsinline muted></video>
         <canvas id="output"></canvas>
 
-        <div id="instruct">Camera is off — press Start camera to train.</div>
+        <div id="instruct" data-i18n="hint.idle">Camera is off — press Start camera to train.</div>
         <div id="ring"><span id="ringLabel">2.0s</span></div>
 
         <div id="startOverlay">
           <div class="startCard">
-            <div class="startKicker">Camera off</div>
-            <h3>Seiken (Closed Fist) Trainer</h3>
-            <p id="startMsg">Your camera stays off until you press start. Nothing is recorded or uploaded.</p>
-            <p id="startMsg">For best experience, using a laptop / PC is recommended.</p>
-            <button id="startBtn" type="button" disabled>Loading hand model…</button>
+            <div class="startKicker" data-i18n="start.kicker">Camera off</div>
+            <h3 data-i18n="start.title">Seiken (Closed Fist) Trainer</h3>
+            <p id="startMsg" data-i18n="start.privacy">Your camera stays off until you press start. Nothing is recorded or uploaded.</p>
+            <p id="startNote" data-i18n="start.hardware">For best experience, using a laptop / PC is recommended.</p>
+            <button id="startBtn" type="button" disabled data-i18n="btn.loading">Loading hand model…</button>
           </div>
         </div>
       </div>
@@ -31,36 +31,43 @@
 
     <aside id="sidebar">
       <header class="side-head">
-        <div class="logo">SEIKEN</div>
-        <div class="tag">Seiken trainer · 3 steps</div>
+        <div class="brand-row">
+          <div class="logo">SEIKEN</div>
+          <div class="lang-switch" role="group" aria-label="Language" data-i18n-aria-label="lang.label">
+            <button class="lang-btn" type="button" data-lang="en" aria-pressed="true" title="English">EN</button>
+            <button class="lang-btn" type="button" data-lang="id" aria-pressed="false" title="Bahasa Indonesia">ID</button>
+          </div>
+        </div>
+        <div class="tag" data-i18n="head.tag">Seiken trainer · 3 steps</div>
       </header>
 
       <section class="panel">
-        <div class="panel-title">Camera</div>
+        <div class="panel-title" data-i18n="panel.camera">Camera</div>
         <div class="cam-row">
-          <span id="camState" class="pill">Off</span>
-          <button id="stopBtn" class="btn small" type="button" hidden>Stop camera</button>
+          <span id="camState" class="pill" data-i18n="cam.off">Off</span>
+          <button id="stopBtn" class="btn small" type="button" hidden data-i18n="btn.stop">Stop camera</button>
         </div>
-        <p class="help" id="status">Loading hand model…</p>
+        <p class="help" id="status" data-i18n="status.loading">Loading hand model…</p>
       </section>
 
       <section class="panel">
-        <div class="panel-title">Step preview</div>
+        <div class="panel-title" data-i18n="panel.preview">Step preview</div>
         <figure class="step-figure">
           <img id="stepImg" src="assets/step-1.jpeg" width="480" height="360"
+               data-i18n-alt="preview.1.alt"
                alt="Step 1 of 3: extend all four fingers straight">
-          <figcaption id="stepCaption">Step 1 of 3 — Extend</figcaption>
+          <figcaption id="stepCaption" data-i18n="preview.1.caption">Step 1 of 3 — Extend</figcaption>
         </figure>
       </section>
 
       <section class="panel">
-        <div class="panel-title">Drill · hold each step 2 s</div>
+        <div class="panel-title" data-i18n="panel.drill">Drill · hold each step 2 s</div>
         <div class="steps">
-          <div class="step active" id="hud1"><span class="n">1</span><span>Extend</span></div>
-          <div class="step" id="hud2"><span class="n">2</span><span>Curl</span></div>
-          <div class="step" id="hud3"><span class="n">3</span><span>Seiken</span></div>
+          <div class="step active" id="hud1"><span class="n">1</span><span data-i18n="hud.1">Extend</span></div>
+          <div class="step" id="hud2"><span class="n">2</span><span data-i18n="hud.2">Curl</span></div>
+          <div class="step" id="hud3"><span class="n">3</span><span data-i18n="hud.3">Seiken</span></div>
         </div>
-        <p class="help">Fill the ring at the top of the stage to advance.</p>
+        <p class="help" data-i18n="drill.help">Fill the ring at the top of the stage to advance.</p>
       </section>
 
       <!-- <section class="panel">

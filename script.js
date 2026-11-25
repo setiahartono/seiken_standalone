@@ -1,4 +1,5 @@
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+import { t, getLang, initI18n } from "./i18n.js";
 
 let handLandmarker = null;
 let aspect = 0.75;   // videoHeight / videoWidth, refreshed every frame
@@ -27,9 +28,25 @@ const hudStepEls = ["hud1", "hud2", "hud3"].map((id) => document.getElementById(
 const stepImg = document.getElementById("stepImg");
 const stepCaption = document.getElementById("stepCaption");
 let flashUntil = 0; // success-flash end timestamp
-let lastHint = "";
+let lastHint = "";  // instruction text currently on screen
+let hintSpec = { key: "hint.idle", vars: null }; // key + vars behind that text
 
-const IDLE_HINT = "Camera is off — press Start camera to train.";
+// Remember the key/vars of the instruction being shown, so a language switch can
+// re-render the very same sentence in the new language.
+function setHint(key, vars) {
+  hintSpec = { key, vars: vars || null };
+  return t(key, vars);
+}
+
+// Every user-facing string goes through t() from i18n.js. The keys that are
+// currently on screen live here, so a language switch can repaint the chrome
+// immediately instead of waiting for the next camera frame.
+const ui = {
+  status: "status.loading", // sidebar status line
+  overlay: "start.privacy", // message inside the start card
+  startBtn: "btn.loading",  // start button label
+  startDisabled: true
+};
 
 // The MediaPipe model is loaded lazily and cached. Opening the camera is a
 // separate, explicit user action (see startCamera below).
@@ -67,6 +84,17 @@ function setStatus(text) {
   if (statusEl) statusEl.textContent = text;
 }
 
+// Repaint the strings that depend on runtime state (not on camera frames).
+function renderChrome() {
+  setCamState(t(running ? "cam.on" : "cam.off"), running);
+  setStatus(t(ui.status));
+  if (startBtn) {
+    startBtn.textContent = t(ui.startBtn);
+    startBtn.disabled = ui.startDisabled;
+  }
+  if (startMsg) startMsg.textContent = t(ui.overlay);
+}
+
 // Fit the stage into the main section while keeping the video aspect ratio,
 // so the 80/20 split stays responsive without stretching the picture.
 function fitStage() {
@@ -81,40 +109,43 @@ function fitStage() {
 
 async function init() {
   // No camera here: the model is prepared, the camera waits for the button.
-  updateHud(0, IDLE_HINT, training.step);
-  setCamState("Off", false);
+  updateHud(0, setHint("hint.idle"), training.step);
+  renderChrome();
   fitStage();
-  setStatus("Loading hand model…");
   try {
     await ensureModel();
-    setStatus("Model ready. Press Start camera to train.");
-    startBtn.disabled = false;
-    startBtn.textContent = "Start camera to train";
+    ui.status = "status.ready";
+    ui.startBtn = "btn.start";
+    ui.startDisabled = false;
+    renderChrome();
   } catch (err) {
     console.error(err);
-    setStatus("Hand model failed to load.");
-    startMsg.textContent = "The hand-tracking model could not be downloaded. Check your connection, then retry.";
-    startBtn.disabled = false;
-    startBtn.textContent = "Retry";
+    ui.status = "status.modelError";
+    ui.overlay = "msg.modelError";
+    ui.startBtn = "btn.retry";
+    ui.startDisabled = false;
+    renderChrome();
   }
 }
 
 // Explicit camera start (button). Nothing is captured before this runs.
 async function startCamera() {
   if (running) return;
-  startBtn.disabled = true;
-  startBtn.textContent = "Starting camera…";
-  startMsg.textContent = "Allow camera access in the browser prompt.";
-  setStatus("Starting camera…");
+  ui.startBtn = "btn.starting";
+  ui.startDisabled = true;
+  ui.status = "status.starting";
+  ui.overlay = "msg.allow";
+  renderChrome();
 
   try {
     await ensureModel();
   } catch (err) {
     console.error(err);
-    startBtn.disabled = false;
-    startBtn.textContent = "Retry";
-    startMsg.textContent = "The hand-tracking model could not be downloaded. Check your connection, then retry.";
-    setStatus("Hand model failed to load.");
+    ui.startBtn = "btn.retry";
+    ui.startDisabled = false;
+    ui.status = "status.modelError";
+    ui.overlay = "msg.modelError";
+    renderChrome();
     return;
   }
 
@@ -140,14 +171,14 @@ async function startCamera() {
     flashUntil = 0;
     if (debugEl) debugEl.innerText = "";
 
-    startBtn.disabled = false;
-    startBtn.textContent = "Start camera to train";
+    ui.startBtn = "btn.start";
+    ui.startDisabled = false;
+    ui.status = "status.running";
+    renderChrome();
     startOverlay.classList.add("hidden");
     stopBtn.hidden = false;
-    setCamState("On", true);
-    setStatus("Camera running. Show your hand to the stage.");
     lastHint = "";
-    updateHud(0, "Show your hand to start!", training.step);
+    updateHud(0, setHint("hint.showHand"), training.step);
 
     predictWebcam();
   } catch (err) {
@@ -158,13 +189,11 @@ async function startCamera() {
     }
     video.srcObject = null;
     running = false;
-    startBtn.disabled = false;
-    startBtn.textContent = "Start camera to train";
-    startMsg.textContent = err && err.name === "NotAllowedError"
-      ? "Camera permission was blocked. Allow camera access in the address bar, then try again."
-      : "Could not open the camera. Close other apps that use it, then try again.";
-    setCamState("Off", false);
-    setStatus("Camera unavailable.");
+    ui.startBtn = "btn.start";
+    ui.startDisabled = false;
+    ui.overlay = err && err.name === "NotAllowedError" ? "msg.denied" : "msg.cameraFail";
+    ui.status = "status.unavailable";
+    renderChrome();
   }
 }
 
@@ -183,13 +212,13 @@ function stopCamera() {
   if (debugEl) debugEl.innerText = "";
   startOverlay.classList.remove("hidden");
   stopBtn.hidden = true;
-  startBtn.disabled = false;
-  startBtn.textContent = "Start camera to train";
-  startMsg.textContent = "Camera off. Press start when you are ready.";
-  setCamState("Off", false);
-  setStatus("Camera off.");
+  ui.startBtn = "btn.start";
+  ui.startDisabled = false;
+  ui.overlay = "msg.off";
+  ui.status = "status.off";
+  renderChrome();
   lastHint = "";
-  updateHud(0, IDLE_HINT, training.step);
+  updateHud(0, setHint("hint.idle"), training.step);
 }
 
 startBtn.addEventListener("click", startCamera);
@@ -230,8 +259,9 @@ async function predictWebcam() {
     drawLandmarks(lm, result, now);
     updateDebug(result);
   } else {
-    if (instructEl) instructEl.textContent = "Show your hand to start!";
-    lastHint = "Show your hand to start!";
+    const showHand = setHint("hint.showHand");
+    if (instructEl) instructEl.textContent = showHand;
+    lastHint = showHand;
     if (debugEl) debugEl.innerText = "";
     // A dropped frame must not count toward the hold; drop stale smoothing too.
     training.holdStart = null;
@@ -428,24 +458,29 @@ function advanceHold(conditionMet, now) {
   return Math.min(1, (now - training.holdStart) / THRESH.holdMs);
 }
 
-// Sidebar step picture: one placeholder illustration per step (1..3).
+// Sidebar step picture: one illustration per step (1..3). The file names are
+// language-independent; caption and alt text come from the i18n dictionary.
 const STEP_PREVIEWS = {
-  1: { src: "assets/step-1.jpeg", alt: "Step 1 of 3: extend all four fingers straight", caption: "Step 1 of 3 — Extend" },
-  2: { src: "assets/step-2.jpeg", alt: "Step 2 of 3: curl the four fingers into a fist", caption: "Step 2 of 3 — Curl" },
-  3: { src: "assets/step-3.jpeg", alt: "Step 3 of 3: thumb tip on the middle-ring crease", caption: "Step 3 of 3 — Seiken" }
+  1: { src: "assets/step-1.jpeg", alt: "preview.1.alt", caption: "preview.1.caption" },
+  2: { src: "assets/step-2.jpeg", alt: "preview.2.alt", caption: "preview.2.caption" },
+  3: { src: "assets/step-3.jpeg", alt: "preview.3.alt", caption: "preview.3.caption" }
 };
-let previewStep = 0; // step whose picture is currently shown
+let previewStep = 0;    // step whose picture is currently shown
+let previewLang = null; // language the current caption was written in
 
 function updateStepPreview(step) {
   const n = Math.min(Math.max(step || 1, 1), 3);
-  if (n === previewStep) return; // avoid re-assigning src every frame
+  const lang = getLang();
+  // Re-assign only when the step or the language changes (not every frame).
+  if (n === previewStep && lang === previewLang) return;
   previewStep = n;
+  previewLang = lang;
   const preview = STEP_PREVIEWS[n];
   if (stepImg) {
     stepImg.src = preview.src;
-    stepImg.alt = preview.alt;
+    stepImg.alt = t(preview.alt);
   }
-  if (stepCaption) stepCaption.textContent = preview.caption;
+  if (stepCaption) stepCaption.textContent = t(preview.caption);
 }
 
 // Update the DOM HUD in place (no per-frame innerHTML rebuild).
@@ -472,6 +507,14 @@ function updateHud(progress, hint, step) {
       ringLabel.textContent = step >= 4 ? "✓" : (holdS * (1 - p)).toFixed(1) + "s";
     }
   }
+}
+
+// "index & middle" / "all" — localized so the hint sentence reads naturally
+// in every supported language.
+function fingerList(missing) {
+  return missing.length
+    ? missing.map((name) => t("finger." + name)).join(" & ")
+    : t("finger.all");
 }
 
 function evaluateSeiken(lm, now) {
@@ -573,21 +616,21 @@ function evaluateSeiken(lm, now) {
   if (training.step === 1) {
     const missing = Object.keys(extended).filter((k) => !extended[k]);
     hint = allExtended
-      ? "Hold the extended hand straight..."
-      : "Step 1: Extend " + (missing.length ? missing.join(" & ") : "all") + " fingers straight and flat.";
+      ? setHint("hint.holdOpen")
+      : setHint("hint.step1", { fingers: fingerList(missing) });
   } else if (training.step === 2) {
     const missing = Object.keys(curled).filter((k) => !curled[k]);
     hint = allCurled
-      ? "Hold the fist..."
-      : "Step 2: Curl " + (missing.length ? missing.join(" & ") : "all") + " fingers tightly into a fist.";
+      ? setHint("hint.holdFist")
+      : setHint("hint.step2", { fingers: fingerList(missing) });
   } else if (training.step === 3) {
-    if (trapped) hint = "Step 3: Thumb is INSIDE the fist. Keep it on the OUTSIDE of the curls.";
-    else if (!thumbEdge) hint = "Step 3: Put the thumb tip just toward the middle of the middle finger (not on the edge), pressed against it.";
-    else if (!outside) hint = "Step 3: Rest the thumb ON the outside of the fingers (closer to the camera).";
-    else if (!contact) hint = "Step 3: Press the thumb tight onto the finger — no gap, lock it down.";
-    else hint = "Hold the perfect Seiken... thumb locked tight.";
+    if (trapped) hint = setHint("hint.s3.trapped");
+    else if (!thumbEdge) hint = setHint("hint.s3.edge");
+    else if (!outside) hint = setHint("hint.s3.outside");
+    else if (!contact) hint = setHint("hint.s3.contact");
+    else hint = setHint("hint.holdSeiken");
   } else {
-    hint = "Perfect Seiken! All steps held. Strike with the index & middle knuckles.";
+    hint = setHint("hint.done");
   }
 
   updateHud(progress, hint, training.step);
@@ -808,5 +851,20 @@ function updateDebug(r) {
     " | lock=" + (r.thumbOk ? "Y" : "N") +
     " | curl=" + curledCount + "/4 ext=" + extendedCount + "/4";
 }
+
+// A language switch can happen at any time: repaint the chrome, then re-render
+// the instruction currently on screen from its key/vars (the static pass resets
+// that line, so lastHint is cleared to force the rewrite) together with the
+// step caption and the ring.
+document.addEventListener("seiken:langchange", () => {
+  renderChrome();
+  const held = training.holdStart === null
+    ? 0
+    : Math.min(1, (performance.now() - training.holdStart) / THRESH.holdMs);
+  lastHint = "";
+  updateHud(held, t(hintSpec.key, hintSpec.vars), training.step);
+});
+
+initI18n();
 
 init();
