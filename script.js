@@ -291,10 +291,11 @@ const HAND_CONNECTIONS = [
 const THRESH = {
   extendMinAngle: 150,    // joint angle at PIP/DIP above this => finger is straight
   curlMaxAngle: 115,      // joint angle at PIP/DIP below this => finger is curled
-  thumbGapMin: 0.30,      // fraction middle(0) -> ring(1): middle-finger side of the crease
-  thumbGapMax: 0.58,      // past this the thumb has slid off toward the ring finger
-  thumbGapIdeal: 0.44,    // ideal tip spot: just toward the middle finger's centre, not its edge
-  creaseTolerance: 0.35,  // max offset from the middle-ring crease (x palm width) -> locked tight
+  thumbGapMin: 0.72,      // fraction index tip(0) -> middle tip(1): how far up the crease it may sit
+  thumbGapMax: 1.06,      // past this the thumb tip has slid off beyond the middle fingertip
+  thumbGapIdeal: 1.0,     // ideal tip spot: the lower end of the middle finger (its tip, 12)
+  edgeLift: 0.125,        // ...then this far (x palm width) up INTO the fold: 1/8 above the bottom edge
+  creaseTolerance: 0.35,  // max offset from the index-middle crease (x palm width) -> locked tight
   outsideDepth: 0.10,     // thumb may sit at most this much deeper than the finger ridge
   contactDepth: 0.25,     // max the thumb may float IN FRONT of the ridge (press it down)
   trappedDepth: 0.40,     // deeper than this => thumb is buried INSIDE the fist
@@ -322,7 +323,6 @@ function smooth(key, value, alpha = 0.5) {
 
 // ---------- Small 3D vector helpers ----------
 function sub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
-function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 }; }
 function mag(v) { return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z); }
 function dot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 
@@ -342,6 +342,22 @@ function fingerBend(lm, mcp, pip, dip, tip) {
   );
 }
 
+// Ideal step-3 thumb-tip spot: the point `thumbGapIdeal` of the way along the
+// crease (index tip 8 -> middle tip 12), then lifted THRESH.edgeLift palm widths
+// INTO the fold (toward the middle finger's DIP) so the thumb tip rests a short
+// way UP from the bottom edge of the folded fingers instead of right on it.
+// Returning the lifted point as the crease's far end keeps t = 1 exactly on it.
+function creaseTarget(A, B, P, palmW) {
+  const gx = A.x + THRESH.thumbGapIdeal * (B.x - A.x);
+  const gy = A.y + THRESH.thumbGapIdeal * (B.y - A.y);
+  const len = Math.hypot(B.x - A.x, B.y - A.y) || 1e-6;
+  let nx = -(B.y - A.y) / len, ny = (B.x - A.x) / len;
+  // Point the normal up into the fold, i.e. toward the middle finger's DIP.
+  if (nx * (P[11].x - gx) + ny * (P[11].y - gy) < 0) { nx = -nx; ny = -ny; }
+  const lift = THRESH.edgeLift * palmW;
+  return { x: gx + nx * lift, y: gy + ny * lift };
+}
+
 // ---------- Target pose templates (synthesized, no assets) ----------
 function rotDir(d, deg) {
   const r = (deg * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r);
@@ -356,6 +372,23 @@ function curledChain(mcp, L = 0.055, stepDeg = 85) {
   const d3 = rotDir(d2, -stepDeg);
   const tip = { x: dip.x + L * d3.x, y: dip.y + L * d3.y };
   return { pip, dip, tip };
+}
+
+// Thumb chain (2 -> 3 -> 4) reaching `tip` from the thumb CMC, bowed slightly
+// outward so the ideal guide still reads as a thumb and not as a stick.
+function thumbChain(mcp, tip, bow = 0.12) {
+  const dx = tip.x - mcp.x, dy = tip.y - mcp.y;
+  const dist = Math.hypot(dx, dy) || 1e-6;
+  const ux = dx / dist, uy = dy / dist;
+  const nx = -uy, ny = ux;
+  function at(s) {
+    const bulge = bow * dist * Math.sin(Math.PI * s);
+    return {
+      x: mcp.x + ux * dist * s + nx * bulge,
+      y: mcp.y + uy * dist * s + ny * bulge
+    };
+  }
+  return { 2: at(1 / 3), 3: at(2 / 3), 4: { x: tip.x, y: tip.y } };
 }
 
 function blankHand() {
@@ -392,14 +425,18 @@ function buildTemplates() {
     fist[pi] = c.pip; fist[di] = c.dip; fist[ti] = c.tip;
   }
 
-  // SEIKEN: fist with the thumb tip at the ideal middle->ring spot.
+  // SEIKEN: fist with the thumb tip pressed into the crease, a short way up from
+  // the bottom edge at the lower end of the middle finger (index tip 8 -> the
+  // ideal spot above middle tip 12, see creaseTarget).
   const seiken = fist.map((p) => ({ x: p.x, y: p.y }));
-  const A = mid(seiken[10], seiken[11]);
-  const B = mid(seiken[14], seiken[15]);
-  seiken[4] = {
-    x: A.x + THRESH.thumbGapIdeal * (B.x - A.x),
-    y: A.y + THRESH.thumbGapIdeal * (B.y - A.y)
-  };
+  const A = seiken[8];   // index fingertip
+  const B = seiken[12];  // middle fingertip: the lower end of the middle finger
+  const palmW = Math.hypot(seiken[5].x - seiken[17].x, seiken[5].y - seiken[17].y) || 1e-6;
+  const tip = creaseTarget(A, B, seiken, palmW);
+  const thumb = thumbChain(seiken[1], tip);
+  seiken[2] = thumb[2];
+  seiken[3] = thumb[3];
+  seiken[4] = thumb[4];
 
   return { 1: toLocal(open), 2: toLocal(fist), 3: toLocal(seiken) };
 }
@@ -545,22 +582,24 @@ function evaluateSeiken(lm, now) {
     if (!extended[name]) allExtended = false;
   }
 
-  // ----- Thumb: right at the edge of the middle finger, barely touching the ring -----
-  // The crease runs from the middle finger (PIP-DIP) to the ring finger (PIP-DIP).
-  const A = mid(P[10], P[11]); // middle finger contact zone
-  const B = mid(P[14], P[15]); // ring finger contact zone
+  // ----- Thumb: pressed into the crease at the lower end of the middle finger -----
+  // The crease runs between the two fingertips (index 8, middle 12); the ideal
+  // spot is a short way UP from that bottom edge (see creaseTarget), so the far
+  // end of the axis is the lifted spot and t = 1 lands exactly on it.
+  const A = P[8];         // index fingertip
+  const B = creaseTarget(A, P[12], P, palmWidth);  // just above the middle fingertip
   const abx = B.x - A.x, aby = B.y - A.y;
   const abLenSq = abx * abx + aby * aby || 1e-6;
   const thumb = P[4];
-  // Fraction along middle -> ring: 0 = middle center, 0.5 = touching edges, 1 = ring center.
+  // Fraction along index tip -> ideal spot: 0 = index fingertip, 1 = ideal spot.
   const t = smooth("t", ((thumb.x - A.x) * abx + (thumb.y - A.y) * aby) / abLenSq);
   const projX = A.x + t * abx, projY = A.y + t * aby;
   // Perpendicular distance from the crease (how close the thumb hugs the fingers).
   const creaseDist = smooth("creaseDist", Math.hypot(thumb.x - projX, thumb.y - projY));
 
-  // "Slightly toward the middle finger's centre, not the edge" => t just
-  // under 0.5 (0 = middle centre, 0.5 = boundary, 1 = ring centre). The
-  // narrow window + tight crease tolerance keeps the thumb LOCKED in place.
+  // "An eighth of a palm width up from the bottom edge of the fold" => t = 1
+  // (0 = index tip). The narrow window + tight crease tolerance keeps the thumb
+  // LOCKED in place.
   const thumbEdge =
     t >= THRESH.thumbGapMin &&
     t <= THRESH.thumbGapMax &&
@@ -653,7 +692,7 @@ const THUMB_BONES = [[0, 1], [1, 2], [2, 3], [3, 4]];
 const FINGER_TIPS = { index: 8, middle: 12, ring: 16, pinky: 20 };
 const FINGER_PIPS = { index: 6, middle: 10, ring: 14, pinky: 18 };
 
-const LOCK_R = 9; // radius (px) of the target ring on the middle -> ring crease
+const LOCK_R = 9; // radius (px) of the lock ring on the ideal spot above the middle fingertip
 
 function toPx(p, W, H) { return { x: p.x * W, y: p.y * H }; }
 
@@ -821,7 +860,7 @@ function drawLandmarks(landmarks, result, now) {
     drawGhost(landmarks, step, satisfied, W, H, tipAt);
   }
 
-  // Middle -> ring crease + target spot (only relevant for step 3).
+  // Index tip -> ideal spot guide line + target ring (only relevant for step 3).
   if (step === 3 || finished) {
     const A = result.points.A, B = result.points.B;
     const ax = A.x * W, ay = (A.y / aspect) * H;
